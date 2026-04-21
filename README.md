@@ -1,193 +1,228 @@
-# 🚇 NYC Subway Delay Prediction System
+🚇 NYC Subway Delay Prediction System
+📌 Project Overview
 
-## 📌 Overview
+This project develops a machine learning-based system to predict subway delays in the New York City transit network. By leveraging historical operational data and GTFS datasets, the system estimates delay propagation across stations and provides a user-friendly dashboard for real-time interaction.
 
-This project builds an end-to-end machine learning system to predict NYC subway delays using real-time transit data and external weather conditions.
+The system integrates:
 
-The system combines data engineering, feature engineering, and regression modeling to capture delay patterns and improve prediction accuracy.
+Data preprocessing pipeline
+Feature engineering
+XGBoost regression model
+Flask-based web application
+Interactive delay prediction dashboard
+🎯 Problem Statement
 
----
+Subway delays significantly impact urban mobility and commuter planning. Delays often propagate across multiple stations due to cascading effects in the transit network.
 
-## 🎯 Problem Formulation
+This project models delay prediction as a supervised regression problem:
 
-We model subway delay prediction as a regression problem:
+y
+^
+	​
 
-y = f(X)
+=f(X)
 
 Where:
 
-* X = input features (time, sequence, weather)
-* y = predicted delay (in seconds)
-
----
-
-## 📊 Data Sources
-
-* MTA GTFS Realtime API (train updates)
-* Static GTFS dataset (schedule data)
-* Weather API (temperature, humidity, visibility)
-
----
-
-## ⚙️ Project Pipeline
-
-### 1. Data Collection
-
-* Real-time subway data collected via API
-* 30M+ records generated
-* Stored trip-level and stop-level information
-
----
-
-### 2. Data Preprocessing
-
-* Removed duplicate records
-* Fixed inconsistencies in `stop_id`
-* Merged real-time data with scheduled GTFS data
-* Created delay variable:
-
-delay = actual_time − scheduled_time
-
-* Removed extreme outliers:
-
-  * delay < -600 sec
-  * delay > 3600 sec
-
----
-
-## 🧠 Feature Engineering
-
-### ⏱ Temporal Features
-
-* Hour of day
-* Day of week
-* Peak hour indicator
-* Weekend indicator
-
----
-
-### 🔁 Sequential Features
-
-* Previous delay
-* Rolling average delay
-* Cumulative delay
-
-Mathematically:
-
-y_t ≈ f(y_{t-1}, X_t)
-
-This captures delay propagation across stations.
-
----
-
-### 🌦️ Weather Features
-
-* Temperature
-* Humidity
-* Visibility
-* Rain indicator
-
----
-
-## 📐 Mathematical Modeling
-
-### Objective
-
-Learn a function:
-
-f: X → y
-
-that minimizes prediction error.
-
----
-
-### Loss Functions
-
-MAE = (1/n) Σ |yᵢ - ŷᵢ|
-
-RMSE = √[(1/n) Σ (yᵢ - ŷᵢ)²]
-
----
-
-### Evaluation Metric
-
-R² Score:
-
-R² = 1 - (Σ (yᵢ - ŷᵢ)² / Σ (yᵢ - ȳ)²)
-
----
-
-## 🚨 Data Leakage Prevention
-
-Instead of random splitting, we use:
-
-Time-based split:
-
-Training set = past data
-Test set = future data
-
-This ensures realistic evaluation.
-
----
-
-## 🤖 Models Used
-
-* Linear Regression
-* Ridge / Lasso
-* Random Forest
-* Extra Trees
-* Gradient Boosting
-* XGBoost
-* LightGBM
-
----
-
-## 📊 Evaluation Strategy
-
-Models are compared using:
-
-* Mean Absolute Error (MAE)
-* Root Mean Squared Error (RMSE)
-* R² Score
-
-Baseline models:
-
-* Mean delay
-* Previous delay (persistence model)
-
----
-
-## 📁 Repository Structure
-
-```
-collector.py     → data collection  
-preprocess.py    → cleaning & merging  
-features.py      → feature engineering  
-train.py         → model training  
-weather.py       → weather integration  
-data/            → sample dataset  
-```
-
----
-
-## 🔍 Key Insights
-
-* Delay propagation is a strong predictor
-* Temporal patterns significantly impact delays
-* Tree-based models perform best on tabular data
-* Weather adds real-world context
-
----
-
-## 🚀 Future Work
-
-* Integrate historical weather data
-* Add spatial route features
-* Deploy real-time prediction system
-* Explore ensemble learning
-
----
-
-## 🧑‍💻 Author
-
-Nydia
+X = feature vector (time, previous delay, weather, etc.)
+y
+^
+	​
+
+ = predicted delay (in seconds)
+📊 Data Sources
+
+Two primary datasets were used:
+
+1. Real-Time Data
+Actual arrival times
+Trip-level operational data
+2. GTFS Data (General Transit Feed Specification)
+stops.txt → station metadata
+stop_times.txt → scheduled timings
+trips.txt, routes.txt → route structure
+📐 Delay Definition
+Delay=Actual Arrival Time−Scheduled Arrival Time
+🧹 Data Preprocessing
+
+Key preprocessing steps:
+
+Removal of duplicate records
+Timestamp normalization
+Conversion of categorical identifiers
+Merging real-time and scheduled datasets
+Outlier filtering:
+Valid delay range: [-600, 3600] seconds
+Memory optimization:
+Sampling (~300,000 rows) for efficient training
+⚙️ Feature Engineering
+
+Feature engineering was critical to capturing temporal and sequential dependencies.
+
+🕒 Time-Based Features
+hour
+is_peak (rush hours: 7–9 AM, 5–7 PM)
+🔁 Sequential Features
+prev_delay
+rolling_delay
+cumulative_delay
+🌦 Weather Features
+temperature
+humidity
+visibility
+is_rain
+
+(Weather data is currently simulated for modeling purposes.)
+
+⚠️ Challenges & Solutions
+1. Data Leakage
+Issue: Model used future information (e.g., actual arrival)
+Fix: Removed leakage columns and enforced time-based split
+2. Memory Constraints
+Issue: Dataset too large (~3M+ rows)
+Fix: Sampling + efficient model selection
+3. File Path Errors
+Issue: Incorrect dataset paths (stops.txt not found)
+Fix: Absolute path handling using os.path.join()
+4. ID Mismatch (String vs Integer)
+Issue: GTFS stop_id stored as string
+Fix:
+stops_df["stop_id"] = stops_df["stop_id"].astype(str)
+5. Flask Template Errors
+Issue: TemplateNotFound
+Fix: Correct folder structure (templates/index.html)
+🤖 Model Selection: XGBoost
+
+XGBoost was selected due to:
+
+Ability to model nonlinear relationships
+Robustness to noisy data
+High performance on structured/tabular datasets
+Built-in regularization
+📐 Model Representation
+y
+^
+	​
+
+=
+k=1
+∑
+K
+	​
+
+f
+k
+	​
+
+(X)
+
+Where each f
+k
+	​
+
+ is a decision tree.
+
+📈 Model Evaluation
+
+Evaluation metrics:
+
+MAE (Mean Absolute Error)
+MAE=
+n
+1
+	​
+
+∑∣y−
+y
+^
+	​
+
+∣
+RMSE (Root Mean Squared Error)
+RMSE=
+n
+1
+	​
+
+∑(y−
+y
+^
+	​
+
+)
+2
+	​
+
+R² Score
+R
+2
+=1−
+SS
+tot
+	​
+
+SS
+res
+	​
+
+	​
+
+✅ Final Results
+Metric	Value
+MAE	~224 sec
+RMSE	~467 sec
+R²	~0.85
+
+👉 Indicates strong predictive performance.
+
+🌐 System Architecture
+Raw Data → Preprocessing → Feature Engineering → XGBoost Model → Flask App → Dashboard
+🖥️ Web Application
+
+A Flask-based web interface allows users to:
+
+Select subway station (mapped from GTFS)
+Input:
+Time
+Previous delay
+Weather condition
+View predicted delays across upcoming stations
+🎨 Dashboard Features
+Station-wise delay predictions
+Color-coded delay levels:
+🟢 Low (<120 sec)
+🟡 Medium (120–300 sec)
+🔴 High (>300 sec)
+Route simulation visualization
+⚠️ Limitations
+Uses simulated weather data
+Current route prediction uses sequential approximation (+i)
+No real-time subway tracking
+GTFS not fully integrated for route sequencing
+🚀 Future Work
+Integration with real-time APIs (MTA feeds)
+Use of LSTM / Time Series models
+Real route prediction using stop_times.txt
+Map-based visualization (Leaflet / Mapbox)
+Mobile-friendly UI
+📌 Conclusion
+
+This project demonstrates how machine learning can be applied to urban transit systems to predict delays and improve commuter decision-making.
+
+By combining data engineering, predictive modeling, and web deployment, the system provides a scalable foundation for real-world transit intelligence applications.
+
+📂 Project Structure
+NYC-subway-delay-predictor/
+│
+├── data/
+├── gtfs_subway/
+├── features.py
+├── train.py
+├── app.py
+├── templates/
+│   └── index.html
+├── xgboost_model.pkl
+└── README.md
+👩‍💻 Author
+
+Nydia Takhel
