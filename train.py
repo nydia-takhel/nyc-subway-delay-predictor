@@ -2,33 +2,64 @@ import pandas as pd
 import numpy as np
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
 
 # ==============================
 # LOAD DATA
 # ==============================
 df = pd.read_csv("features_data.csv")
+df = df.sample(300000, random_state=42)
 
 print("Dataset shape:", df.shape)
 
 # ==============================
-# SORT (CRITICAL - NO LEAKAGE)
+# SORT (TIME ORDER)
 # ==============================
 df = df.sort_values('actual_sec')
 
 # ==============================
-# TARGET + FEATURES
+# REMOVE LEAKAGE COLUMNS (CRITICAL FIX)
+# ==============================
+leakage_cols = [
+    'delay',              # target
+    'trip_id_x',
+    'trip_id_y',
+    'arrival_time_x',
+    'arrival_time_y',
+    'datetime'
+]
+
+# Keep only existing columns
+leakage_cols = [col for col in leakage_cols if col in df.columns]
+
+# ==============================
+# TARGET
 # ==============================
 y = df['delay']
 
-X = df.drop(columns=['delay'])
+# ==============================
+# FEATURES (SAFE)
+# ==============================
+# X = df.drop(columns=leakage_cols)
+drop_cols = [
+    'delay',
+    'actual_sec',
+    'scheduled_sec',
+    'arrival_time_x',
+    'arrival_time_y',
+    'datetime',
+    'trip_id_x',
+    'trip_id_y'
+]
 
-# Keep only numeric columns for ML
+drop_cols = [col for col in drop_cols if col in df.columns]
+
+X = df.drop(columns=drop_cols)
+
+# keep only numeric
 X = X.select_dtypes(include=[np.number])
 
 # ==============================
@@ -36,14 +67,14 @@ X = X.select_dtypes(include=[np.number])
 # ==============================
 split = int(len(df) * 0.8)
 
-X_train, X_test = X[:split], X[split:]
-y_train, y_test = y[:split], y[split:]
+X_train, X_test = X.iloc[:split], X.iloc[split:]
+y_train, y_test = y.iloc[:split], y.iloc[split:]
 
 print("Train size:", X_train.shape)
 print("Test size:", X_test.shape)
 
 # ==============================
-# BASELINE 1: MEAN
+# BASELINE
 # ==============================
 print("\n📉 Baseline: Mean")
 
@@ -55,25 +86,17 @@ print("R2:", r2_score(y_test, baseline))
 
 
 # ==============================
-# MODELS TO COMPARE
+# MODELS
 # ==============================
-# models = {
-#     "Linear Regression": LinearRegression(),
-#     "Random Forest": RandomForestRegressor(n_estimators=50, max_depth=10),
-#     "XGBoost": XGBRegressor(n_estimators=50, max_depth=6),
-#     "LightGBM": LGBMRegressor(n_estimators=50)
-# }
-
-
 models = {
-    "Linear": LinearRegression(),
-    "Ridge": Ridge(alpha=1.0),
-    "Lasso": Lasso(alpha=0.1),
-    "RandomForest": RandomForestRegressor(n_estimators=50, max_depth=10),
-    "ExtraTrees": ExtraTreesRegressor(n_estimators=50),
-    "GradientBoosting": GradientBoostingRegressor(n_estimators=50),
-    "XGBoost": XGBRegressor(n_estimators=50, max_depth=6),
-    "LightGBM": LGBMRegressor(n_estimators=50)
+    # "Linear": LinearRegression(),
+    # "Ridge": Ridge(alpha=1.0),
+    # "Lasso": Lasso(alpha=0.1),
+    # "RandomForest": RandomForestRegressor(n_estimators=20, max_depth=8),
+    # "ExtraTrees": ExtraTreesRegressor(n_estimators=20),
+    # "GradientBoosting": GradientBoostingRegressor(n_estimators=20),
+    "XGBoost": XGBRegressor(n_estimators=20, max_depth=5),
+    # "LightGBM": LGBMRegressor(n_estimators=20)
 }
 
 results = []
@@ -100,14 +123,18 @@ for name, model in models.items():
 
 
 # ==============================
-# FINAL COMPARISON TABLE
+# RESULTS TABLE
 # ==============================
 results_df = pd.DataFrame(results, columns=["Model", "MAE", "RMSE", "R2"])
 
 print("\n📊 FINAL MODEL COMPARISON")
 print(results_df.sort_values(by="RMSE"))
 
-# OPTIONAL: SAVE RESULTS
+# SAVE RESULTS
 results_df.to_csv("model_results.csv", index=False)
-print("\nBest Model based on RMSE:")
+
+print("\n🏆 Best Model:")
 print(results_df.sort_values(by="RMSE").iloc[0])
+
+import joblib
+joblib.dump(model, "xgboost_model.pkl")
