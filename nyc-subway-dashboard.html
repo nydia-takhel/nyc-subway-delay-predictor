@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NYC Subway Delay Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════ THEME ══════════════════ */
+[data-theme="light"] {
+  --bg:#eef4fd; --bg2:#e2ecf8; --surface:#fff; --surface2:#f4f8ff;
+  --border:#c8d9f0; --border2:#dbeafe;
+  --blue-dk:#1a5fb4; --blue-md:#2d7dd2; --blue-lt:#4fa3e8; --blue-xl:#bfdbfe; --sky:#ddeeff;
+  --green:#15803d; --green-bg:#dcfce7; --green-b:#86efac;
+  --amber:#b45309; --amber-bg:#fef3c7; --amber-b:#fcd34d;
+  --red:#dc2626; --red-bg:#fee2e2; --red-b:#fca5a5;
+  --text:#0f172a; --text2:#334155; --muted:#64748b; --muted2:#94a3b8;
+  --map-bg:#f0f6ff; --map-grid:#d4e6f8;
+  --sh-sm:0 1px 4px rgba(15,50,120,.07); --sh-md:0 4px 18px rgba(15,50,120,.11);
+  --demo-bg:#fffbeb; --demo-border:#fcd34d; --demo-text:#92400e;
+  --ribbon:linear-gradient(90deg,#1a5fb4,#2d7dd2);
+}
+[data-theme="dark"] {
+  --bg:#0d1117; --bg2:#161b22; --surface:#1c2333; --surface2:#212a3e;
+  --border:#2d3a52; --border2:#253048;
+  --blue-dk:#60b3f5; --blue-md:#4fa3e8; --blue-lt:#7ec8ff; --blue-xl:#1e3a5f; --sky:#1a2f4a;
+  --green:#4ade80; --green-bg:#052e16; --green-b:#166534;
+  --amber:#fbbf24; --amber-bg:#1c1500; --amber-b:#78350f;
+  --red:#f87171; --red-bg:#1c0505; --red-b:#7f1d1d;
+  --text:#e2e8f0; --text2:#94a3b8; --muted:#64748b; --muted2:#475569;
+  --map-bg:#111827; --map-grid:#1e293b;
+  --sh-sm:0 1px 4px rgba(0,0,0,.3); --sh-md:0 4px 18px rgba(0,0,0,.4);
+  --demo-bg:#1c1500; --demo-border:#78350f; --demo-text:#fbbf24;
+  --ribbon:linear-gradient(90deg,#1e3a5f,#1a4278);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:13px;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s;}
+
+/* ══ DEMO BANNER ══ */
+.demo-banner{background:var(--demo-bg);border-bottom:1.5px solid var(--demo-border);padding:6px 24px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:11.5px;font-weight:600;color:var(--demo-text);}
+.live-ind{display:flex;align-items:center;gap:5px;margin-left:12px;font-family:'IBM Plex Mono',monospace;font-size:10px;}
+.live-dot-red{width:7px;height:7px;border-radius:50%;background:var(--red);animation:blink 1.4s ease infinite;}
+.live-dot-grn{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 1.4s ease infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ══ HEADER ══ */
+header{background:var(--surface);border-bottom:1.5px solid var(--border);padding:0 22px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:300;box-shadow:var(--sh-sm);transition:background .3s;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:36px;height:36px;background:var(--blue-dk);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(26,95,180,.3);}
+.logo-text h1{font-size:14.5px;font-weight:800;color:var(--blue-dk);letter-spacing:-.3px;line-height:1.1;}
+.logo-text span{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);}
+.hdr-r{display:flex;align-items:center;gap:8px;}
+.chip{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:18px;font-size:10.5px;font-weight:600;border:1.5px solid;}
+.chip-grn{background:var(--green-bg);border-color:var(--green-b);color:var(--green);font-family:'IBM Plex Mono',monospace;}
+.chip-blue{background:var(--sky);border-color:var(--blue-xl);color:var(--blue-dk);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s ease infinite;}
+.ts-chip{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 9px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);}
+.ts-chip.stale{color:var(--red);border-color:var(--red-b);background:var(--red-bg);}
+.ibtn{width:30px;height:30px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:.2s;color:var(--text);}
+.ibtn:hover{background:var(--sky);border-color:var(--blue-lt);}
+
+/* ══ RIBBON ══ */
+.ribbon{background:var(--ribbon);color:#fff;padding:6px 22px;display:flex;align-items:center;gap:12px;overflow:hidden;}
+.r-tag{background:rgba(255,255,255,.18);padding:2px 8px;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;white-space:nowrap;flex-shrink:0;}
+.r-scroll{overflow:hidden;flex:1;}
+.r-inner{display:flex;gap:28px;animation:scrollr 35s linear infinite;white-space:nowrap;}
+@keyframes scrollr{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.r-item{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:500;opacity:.93;}
+.r-pill{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:8px;font-weight:800;}
+
+/* ══ LAYOUT ══ */
+.page{display:grid;grid-template-columns:285px 1fr 272px;height:calc(100vh - 114px);}
+.col{overflow-y:auto;padding:13px 12px;display:flex;flex-direction:column;gap:11px;}
+.col-l{border-right:1.5px solid var(--border);background:var(--bg);}
+.col-m{background:var(--bg);padding:13px 14px;}
+.col-r{border-left:1.5px solid var(--border);background:var(--bg);}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ══ CARD ══ */
+.card{background:var(--surface);border:1.5px solid var(--border2);border-radius:11px;padding:13px;box-shadow:var(--sh-sm);transition:box-shadow .2s,background .3s;}
+.card:hover{box-shadow:var(--sh-md);}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
+.card-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--blue-dk);display:flex;align-items:center;gap:6px;}
+.ct-ic{width:20px;height:20px;border-radius:5px;background:var(--sky);display:flex;align-items:center;justify-content:center;font-size:11px;}
+
+/* ══ KPI STRIP ══ */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+.kpi{background:var(--surface);border:1.5px solid var(--border2);border-radius:11px;padding:13px 11px;box-shadow:var(--sh-sm);position:relative;overflow:hidden;transition:.2s;cursor:default;}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--sh-md);}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:11px 11px 0 0;}
+.kpi.bl::after{background:linear-gradient(90deg,var(--blue-dk),var(--blue-lt))}
+.kpi.rd::after{background:linear-gradient(90deg,var(--red),#f87171)}
+.kpi.gn::after{background:linear-gradient(90deg,var(--green),#4ade80)}
+.kpi.am::after{background:linear-gradient(90deg,var(--amber),#fbbf24)}
+.kpi-badge{position:absolute;top:11px;right:9px;font-size:8.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;padding:2px 5px;border-radius:5px;}
+.b-up{background:var(--red-bg);color:var(--red)}.b-dn{background:var(--green-bg);color:var(--green)}.b-nt{background:var(--amber-bg);color:var(--amber)}
+.kpi-icon{font-size:18px;margin-bottom:4px;}
+.kpi-val{font-size:22px;font-weight:800;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums;}
+.kpi-val.bl{color:var(--blue-dk)}.kpi-val.rd{color:var(--red)}.kpi-val.gn{color:var(--green)}.kpi-val.am{color:var(--amber)}
+.kpi-lbl{font-size:10px;font-weight:600;color:var(--muted);margin-top:3px;}
+.kpi-den{font-size:9px;color:var(--muted2);margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+
+/* ══ MAP ══ */
+.map-wrap{background:var(--surface);border:1.5px solid var(--border2);border-radius:11px;padding:13px;box-shadow:var(--sh-sm);display:flex;flex-direction:column;}
+.map-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;flex-wrap:wrap;gap:6px;}
+.legend{display:flex;gap:11px;flex-wrap:wrap;}
+.leg{display:flex;align-items:center;gap:4px;font-size:9.5px;font-weight:500;color:var(--muted);}
+.leg-d{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+#subwayMap{width:100%;border-radius:7px;cursor:crosshair;}
+.map-note{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted2);margin-top:6px;text-align:center;}
+
+/* ══ MAP TOOLTIP ══ */
+.mtt{position:fixed;background:var(--text);color:var(--surface);padding:8px 12px;border-radius:8px;font-size:11px;font-family:'IBM Plex Mono',monospace;pointer-events:none;display:none;z-index:999;line-height:1.7;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+
+/* ══ HOURLY CHART ══ */
+.chart-wrap{position:relative;height:88px;}
+#areaChart{width:100%;height:100%;}
+.chart-lbls{display:flex;justify-content:space-between;margin-top:4px;}
+.chart-lbls span{font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:var(--muted2);}
+
+/* ══ STATION LIST ══ */
+.stn-list{display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;}
+.stn-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:7px;padding:7px 9px;border-radius:8px;background:var(--surface2);border:1.5px solid transparent;transition:.18s;cursor:default;}
+.stn-row:hover{background:var(--sky);border-color:var(--border);}
+.stn-lines{display:flex;gap:2px;flex-shrink:0;}
+.stn-pill{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:800;box-shadow:0 1px 3px rgba(0,0,0,.18);}
+.stn-info{overflow:hidden;}
+.stn-name{font-size:10.5px;font-weight:600;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.stn-sub{font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--muted2);margin-top:1px;}
+.stn-right{text-align:right;flex-shrink:0;}
+.stn-delay{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;color:var(--text);}
+.stn-badge{font-size:8px;font-weight:700;padding:2px 5px;border-radius:6px;font-family:'IBM Plex Mono',monospace;white-space:nowrap;display:block;margin-top:2px;text-align:center;}
+.b-ok{background:var(--green-bg);color:var(--green)}.b-med{background:var(--amber-bg);color:var(--amber)}.b-hi{background:var(--red-bg);color:var(--red)}
+
+/* ══ ARRIVAL BOARD ══ */
+.arrival-board{background:var(--text);border-radius:10px;padding:11px;overflow:hidden;}
+.ab-header{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;color:#fbbf24;letter-spacing:2px;margin-bottom:8px;text-align:center;}
+.ab-row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.07);}
+.ab-row:last-child{border-bottom:none;}
+.ab-pill{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.ab-station{font-size:10.5px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ab-time{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#e2e8f0;white-space:nowrap;}
+.ab-status{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;white-space:nowrap;}
+.abs-late{background:#7f1d1d;color:#fca5a5;}
+.abs-ok{background:#052e16;color:#4ade80;}
+.abs-mod{background:#1c1500;color:#fbbf24;}
+
+/* ══ BAR CHART ══ */
+.bar-list{display:flex;flex-direction:column;gap:5px;}
+.bar-row{display:flex;align-items:center;gap:6px;}
+.bar-lbl{width:72px;font-size:9.5px;font-weight:600;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bar-track{flex:1;height:14px;background:var(--bg2);border-radius:7px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:7px;display:flex;align-items:center;padding-left:5px;font-size:8.5px;font-family:'IBM Plex Mono',monospace;font-weight:600;transition:width 1.4s cubic-bezier(.4,0,.2,1);}
+.bar-num{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);width:32px;text-align:right;}
+.feat-note{font-size:9px;color:var(--muted2);margin-top:6px;padding:6px 8px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--blue-lt);line-height:1.5;}
+
+/* ══ LINE BUTTONS ══ */
+.line-grid{display:flex;flex-wrap:wrap;gap:4px;}
+.lbtn{width:31px;height:31px;border-radius:50%;border:2.5px solid transparent;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:800;cursor:pointer;transition:.18s;display:flex;align-items:center;justify-content:center;position:relative;}
+.lbtn:hover{transform:scale(1.14);box-shadow:0 3px 12px rgba(0,0,0,.22);}
+.lbtn.off{opacity:.22;transform:scale(.88);}
+.lbtn .tt{display:none;position:absolute;bottom:calc(100%+4px);left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:8.5px;padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;font-family:'IBM Plex Mono',monospace;}
+.lbtn:hover .tt{display:block;}
+
+/* ══ TRIP PLANNER ══ */
+.tp-grid{display:flex;flex-direction:column;gap:8px;}
+.tp-row{display:flex;flex-direction:column;gap:3px;}
+.tp-lbl{font-size:9.5px;font-weight:700;color:var(--blue-dk);letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:4px;}
+.tp-lbl .inf{width:13px;height:13px;border-radius:50%;background:var(--sky);border:1px solid var(--border);font-size:8px;display:inline-flex;align-items:center;justify-content:center;cursor:help;color:var(--blue-dk);font-weight:700;}
+.tp-select,.tp-input{background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11.5px;font-weight:500;outline:none;width:100%;transition:.18s;-webkit-appearance:none;}
+.tp-select:focus,.tp-input:focus{border-color:var(--blue-md);background:var(--surface);box-shadow:0 0 0 3px rgba(45,125,210,.1);}
+.tp-grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.tp-btn{width:100%;padding:9px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--blue-dk),var(--blue-md));color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:800;cursor:pointer;transition:.2s;box-shadow:0 3px 10px rgba(26,95,180,.28);}
+.tp-btn:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(26,95,180,.38);}
+.tp-result{display:none;padding:12px;background:var(--sky);border:1.5px solid var(--blue-xl);border-radius:9px;}
+.tp-result.show{display:block;animation:fadeUp .25s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.tp-rec{font-size:13px;font-weight:800;color:var(--blue-dk);margin-bottom:6px;}
+.tp-detail{display:flex;flex-direction:column;gap:5px;}
+.tp-drow{display:flex;justify-content:space-between;align-items:center;font-size:11px;}
+.tp-dkey{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:9.5px;}
+.tp-dval{font-weight:700;color:var(--text);}
+.tp-dval.late{color:var(--red);}
+.tp-dval.ok{color:var(--green);}
+.tp-warn{font-size:9.5px;color:var(--amber);margin-top:5px;padding:5px 7px;background:var(--amber-bg);border-radius:6px;border-left:2px solid var(--amber);}
+
+/* ══ WORST TIME ══ */
+.worst-time{background:linear-gradient(135deg,var(--amber-bg),var(--red-bg));border:1.5px solid var(--amber-b);border-radius:10px;padding:10px 11px;display:flex;align-items:flex-start;gap:9px;}
+.wt-text .wt-title{font-size:11px;font-weight:700;color:var(--amber);}
+.wt-text .wt-body{font-size:10px;color:var(--text2);margin-top:2px;line-height:1.5;}
+
+/* ══ METRICS ══ */
+.met-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.met{background:var(--surface2);border:1.5px solid var(--border2);border-radius:8px;padding:9px 10px;text-align:center;}
+.met-val{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;}
+.met-key{font-size:9.5px;font-weight:600;color:var(--muted);margin-top:2px;}
+.r2-wrap{display:flex;justify-content:center;margin-bottom:8px;position:relative;}
+.r2-ctr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;}
+.r2-num{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700;color:var(--blue-dk);line-height:1;}
+.r2-sub{font-size:8.5px;color:var(--muted);}
+.tr-note{font-size:9px;color:var(--muted2);text-align:center;margin-top:6px;font-family:'IBM Plex Mono',monospace;background:var(--surface2);padding:5px 7px;border-radius:5px;}
+
+/* ══ ALERTS ══ */
+.alert-list{display:flex;flex-direction:column;gap:5px;}
+.alert{display:flex;gap:7px;padding:8px 9px;border-radius:8px;border-left:3px solid;}
+.alert.hi{background:var(--red-bg);border-color:var(--red)}
+.alert.med{background:var(--amber-bg);border-color:var(--amber)}
+.alert.inf{background:var(--sky);border-color:var(--blue-lt)}
+.alert-ico{font-size:13px;flex-shrink:0;margin-top:1px;}
+.alert-msg{font-size:10.5px;font-weight:600;}
+.alert-sub{font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:var(--muted);margin-top:2px;}
+.alert-act{font-size:9px;font-weight:700;color:var(--blue-dk);margin-top:3px;cursor:pointer;}
+.alert-act:hover{text-decoration:underline;}
+
+/* ══ SPINNER ══ */
+.spinner{display:none;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--blue-dk);border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner.on{display:inline-block;}
+.flash{animation:flashCard .5s ease;}
+@keyframes flashCard{0%{background:var(--sky)}100%{background:var(--surface)}}
+
+/* ══ SECTION DIVIDER ══ */
+.sec-title{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);padding:2px 0;border-bottom:1px solid var(--border2);margin-bottom:2px;}
+
+/* ══ MOBILE ══ */
+@media(max-width:1100px){
+  .page{grid-template-columns:1fr;height:auto;}
+  .col-l,.col-r{border:none;border-top:1.5px solid var(--border);}
+  .kpi-strip{grid-template-columns:repeat(2,1fr);}
+}
+@media(max-width:600px){
+  header{padding:0 12px;}
+  .logo-text span{display:none;}
+  .kpi-strip{grid-template-columns:1fr 1fr;}
+  .hdr-r .ts-chip{display:none;}
+}
+
+/* ══ LOAD ANIMATIONS ══ */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.card,.kpi,.map-wrap{animation:fadeInUp .32s ease both;}
+.kpi:nth-child(1){animation-delay:.04s}.kpi:nth-child(2){animation-delay:.08s}
+.kpi:nth-child(3){animation-delay:.12s}.kpi:nth-child(4){animation-delay:.16s}
+</style>
+</head>
+<body>
+
+<!-- DEMO BANNER -->
+<div class="demo-banner">
+  <span>⚠️</span>
+  <strong>DEMO MODE</strong>
+  <span style="font-weight:400"> — Running on sample data. Live MTA GTFS-RT feed not connected.</span>
+  <div class="live-ind"><div class="live-dot-red"></div>Live Data: OFFLINE</div>
+  <span style="margin-left:10px;font-size:10px;font-weight:400;font-family:'IBM Plex Mono',monospace;">Connect MTA API to enable live mode →</span>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">🚇</div>
+    <div class="logo-text">
+      <h1>NYC SUBWAY DELAY PREDICTOR</h1>
+      <span>nydia-takhel/nyc-subway-delay-predictor · XGBoost R²=0.8849 · 37.6M training rows</span>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="chip chip-grn"><div class="pulse"></div>SAMPLE DATA</div>
+    <div class="ts-chip" id="tsChip">Updated just now</div>
+    <div class="chip chip-blue" id="clock">--:--:--</div>
+    <button class="ibtn" onclick="toggleTheme()" id="themeBtn" title="Toggle dark mode">🌙</button>
+    <button class="ibtn" onclick="doRefresh()" id="refreshBtn" title="Refresh data">
+      <span id="rIcon">↻</span><span class="spinner" id="spinner"></span>
+    </button>
+  </div>
+</header>
+
+<!-- RIBBON -->
+<div class="ribbon">
+  <div class="r-tag">⚡ DELAY FEED</div>
+  <div class="r-scroll"><div class="r-inner" id="ribbonInner"></div></div>
+</div>
+
+<!-- MAP TOOLTIP -->
+<div class="mtt" id="mtt"></div>
+
+<!-- PAGE -->
+<div class="page">
+
+<!-- ══════════ LEFT ══════════ -->
+<div class="col col-l">
+
+  <!-- Line Filter -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title"><div class="ct-ic">🚉</div>Filter by Line</div>
+      <div style="display:flex;gap:4px">
+        <button onclick="selectAll()" style="font-size:8.5px;font-weight:700;color:var(--blue-md);background:var(--sky);border:1px solid var(--blue-xl);padding:2px 7px;border-radius:4px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">ALL</button>
+        <button onclick="clearAll()" style="font-size:8.5px;font-weight:700;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:4px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">CLEAR</button>
+      </div>
+    </div>
+    <div class="line-grid" id="lineGrid"></div>
+  </div>
+
+  <!-- Trip Planner -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title"><div class="ct-ic">🗺</div>Trip Planner</div>
+      <span style="font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;background:var(--surface2);padding:2px 5px;border-radius:4px;">with delay forecast</span>
+    </div>
+    <div class="tp-grid">
+      <div class="tp-row">
+        <label class="tp-lbl">From Station <span class="inf" title="Your departure station">i</span></label>
+        <select class="tp-select" id="tpFrom"></select>
+      </div>
+      <div class="tp-row">
+        <label class="tp-lbl">To Station <span class="inf" title="Your destination station">i</span></label>
+        <select class="tp-select" id="tpTo"></select>
+      </div>
+      <div class="tp-grid2">
+        <div class="tp-row">
+          <label class="tp-lbl">Depart Hour <span class="inf" title="Hour of departure (0-23)">i</span></label>
+          <input class="tp-input" type="number" id="tpHour" value="8" min="0" max="23">
+        </div>
+        <div class="tp-row">
+          <label class="tp-lbl">Day Type <span class="inf" title="Weekday or weekend affects frequency">i</span></label>
+          <select class="tp-select" id="tpDay">
+            <option value="weekday">Weekday</option>
+            <option value="weekend">Weekend</option>
+          </select>
+        </div>
+      </div>
+      <button class="tp-btn" onclick="planTrip()">🔍 PLAN MY TRIP</button>
+      <div class="tp-result" id="tpResult">
+        <div class="tp-rec" id="tpRec">—</div>
+        <div class="tp-detail" id="tpDetail"></div>
+        <div class="tp-warn" id="tpWarn" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Worst Time Banner -->
+  <div class="worst-time">
+    <span style="font-size:22px;flex-shrink:0">⏰</span>
+    <div class="wt-text">
+      <div class="wt-title">Worst Times to Ride</div>
+      <div class="wt-body">Avoid <strong>7–9 AM</strong> & <strong>4–6 PM</strong> weekdays.<br>Peak avg: <strong id="wPeak">—</strong> vs off-peak: <strong id="wOff">—</strong></div>
+    </div>
+  </div>
+
+  <!-- Model Performance -->
+  <div class="card">
+    <div class="card-hd"><div class="card-title"><div class="ct-ic">📐</div>Model Performance</div></div>
+    <div class="r2-wrap">
+      <svg width="86" height="86" viewBox="0 0 86 86">
+        <circle cx="43" cy="43" r="32" fill="none" stroke="var(--border2)" stroke-width="7"/>
+        <circle cx="43" cy="43" r="32" fill="none" stroke="url(#rg)" stroke-width="7"
+          stroke-linecap="round" stroke-dasharray="201.1" stroke-dashoffset="23.1"
+          transform="rotate(-90 43 43)"/>
+        <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#1a5fb4"/><stop offset="100%" stop-color="#4fa3e8"/>
+        </linearGradient></defs>
+      </svg>
+      <div class="r2-ctr"><div class="r2-num">0.885</div><div class="r2-sub">R² Score</div></div>
+    </div>
+    <div class="met-grid">
+      <div class="met"><div class="met-val" style="color:var(--blue-md)">4.8m</div><div class="met-key">MAE (290s)</div></div>
+      <div class="met"><div class="met-val" style="color:#7c3aed">6.9m</div><div class="met-key">RMSE (411s)</div></div>
+      <div class="met"><div class="met-val" style="color:var(--green);font-size:12px">XGBoost</div><div class="met-key">Algorithm</div></div>
+      <div class="met"><div class="met-val" style="font-size:12px">37.6M</div><div class="met-key">Total Rows</div></div>
+    </div>
+    <div class="tr-note">Trained on 300k sample · 8 features · Time-based split 80/20</div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title"><div class="ct-ic">🚨</div>Active Service Alerts</div>
+      <span id="alertCount" style="font-family:'IBM Plex Mono',monospace;font-size:9px;background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:4px;font-weight:700">0</span>
+    </div>
+    <div class="alert-list" id="alertList"></div>
+  </div>
+
+</div>
+
+<!-- ══════════ CENTER ══════════ -->
+<div class="col col-m">
+
+  <div class="kpi-strip" id="kpiStrip"></div>
+
+  <!-- Subway Map -->
+  <div class="map-wrap" style="margin-top:12px">
+    <div class="map-top">
+      <div class="card-title" style="margin:0"><div class="ct-ic">🗺️</div>NYC Subway Delay Map — Hover stations for details</div>
+      <div class="legend">
+        <div class="leg"><div class="leg-d" style="background:var(--green)"></div>On Time</div>
+        <div class="leg"><div class="leg-d" style="background:var(--amber)"></div>Delayed</div>
+        <div class="leg"><div class="leg-d" style="background:var(--red)"></div>Severe</div>
+        <div class="leg"><div class="leg-d" style="background:#aaa"></div>Inactive</div>
+      </div>
+    </div>
+    <svg id="subwayMap" viewBox="0 0 820 370" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="map-note">Click a line button to toggle visibility · Hover station dots for delay details & expected arrival</div>
+  </div>
+
+  <!-- Hourly Chart -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hd">
+      <div class="card-title"><div class="ct-ic">⏰</div>Avg Delay by Hour — All Active Lines</div>
+      <div style="display:flex;gap:9px;align-items:center">
+        <div class="leg"><div style="width:12px;height:3px;background:var(--red);border-radius:2px;flex-shrink:0"></div><span style="font-size:9px">Peak</span></div>
+        <div class="leg"><div style="width:12px;height:3px;background:var(--blue-md);border-radius:2px;flex-shrink:0"></div><span style="font-size:9px">Off-Peak</span></div>
+      </div>
+    </div>
+    <div class="chart-wrap" style="position:relative">
+      <svg id="areaChart" viewBox="0 0 820 88" preserveAspectRatio="none" style="width:100%;height:88px"></svg>
+    </div>
+    <div class="chart-lbls">
+      <span>12AM</span><span>3AM</span><span>6AM</span><span>9AM</span>
+      <span>12PM</span><span>3PM</span><span>6PM</span><span>9PM</span><span>11PM</span>
+    </div>
+  </div>
+
+  <!-- Next Train Arrival Board -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hd">
+      <div class="card-title"><div class="ct-ic">🚆</div>Expected Arrivals — Major Hubs</div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)" id="arrivalTime">as of --:--</span>
+    </div>
+    <div class="arrival-board">
+      <div class="ab-header">NEXT TRAIN ARRIVALS — PREDICTED</div>
+      <div id="arrivalBoard"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ RIGHT ══════════ -->
+<div class="col col-r">
+
+  <!-- Station Status -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title"><div class="ct-ic">📍</div>Station Status</div>
+      <span id="stnCount" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)"></span>
+    </div>
+    <div class="stn-list" id="stnList"></div>
+  </div>
+
+  <!-- Delay by Line -->
+  <div class="card">
+    <div class="card-hd"><div class="card-title"><div class="ct-ic">📊</div>Avg Delay by Line</div></div>
+    <div class="bar-list" id="lineChart"></div>
+  </div>
+
+  <!-- Feature Importance (REAL from train.py) -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-title"><div class="ct-ic">🧠</div>Feature Importance</div>
+      <span style="font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;background:var(--surface2);padding:2px 5px;border-radius:4px">real · train.py</span>
+    </div>
+    <div class="bar-list" id="featChart"></div>
+    <div class="feat-note">
+      💡 <strong>Delay momentum</strong> (rolling + prev) = <strong>68.6%</strong>. Late trains stay late. <code>is_peak</code> scores 0% — hour already captures rush periods.
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+'use strict';
+// ══════════════════════════════════════
+// REAL MODEL DATA (from your train.py)
+// ══════════════════════════════════════
+const MODEL = { r2:0.8849, mae:290.51, rmse:411.34, samples:300000, total:37616153 };
+
+const FEAT_IMPORTANCE = {
+  rolling_delay:37.7, prev_delay:30.9, stop_sequence:11.7,
+  stop_id:11.1, hour:4.7, timestamp:2.9, cumulative_delay:1.0, is_peak:0.0
+};
+const FEAT_COLORS = {
+  rolling_delay:'#2d7dd2',prev_delay:'#7c3aed',stop_sequence:'#b45309',
+  stop_id:'#0891b2',hour:'#15803d',timestamp:'#64748b',
+  cumulative_delay:'#0e7490',is_peak:'#94a3b8'
+};
+const FEAT_DESC = {
+  rolling_delay:'3-trip rolling average delay at this stop',
+  prev_delay:'Delay of the immediately preceding trip',
+  stop_sequence:'Position of this stop in the route (1=first stop)',
+  stop_id:'Which station (numerically encoded)',
+  hour:'Hour of day — captures time patterns',
+  timestamp:'Specific date/time — captures day-of-week etc.',
+  cumulative_delay:'Total accumulated delay across the trip',
+  is_peak:'Rush hour flag — hour already captures this (0%)'
+};
+
+// ══════════════════════════════════════
+// LINE DEFINITIONS
+// ══════════════════════════════════════
+const LINES = [
+  {id:'1',c:'#EE352E',fg:'#fff',freq:10,s:['Van Cortlandt Pk','238 St','231 St','207 St','191 St','181 St','168 St','157 St','145 St','137 St','125 St','116 St','110 St','103 St','96 St','86 St','79 St','72 St','66 St–Lincoln Ctr','59 St–Columbus Cir','50 St','42 St–Times Sq','34 St–Penn Station','28 St','23 St','18 St','14 St','Christopher St','Houston St','Canal St','Franklin St','Chambers St','Cortlandt St','Rector St','South Ferry']},
+  {id:'2',c:'#EE352E',fg:'#fff',freq:8,s:['Wakefield–241 St','233 St','225 St','219 St','180 St','174–175 Sts','Simpson St','3 Ave–149 St','135 St','125 St','72 St','Times Sq–42 St','34 St–Penn Station','14 St','Chambers St','Fulton St','Wall St','Borough Hall','Atlantic Ave','Bergen St','Carroll St','Smith–9 Sts','95 St']},
+  {id:'3',c:'#EE352E',fg:'#fff',freq:12,s:['Harlem–148 St','145 St','135 St','125 St','116 St','96 St','72 St','Times Sq–42 St','34 St–Penn Station','14 St','Chambers St','Fulton St','Wall St','Borough Hall']},
+  {id:'4',c:'#00933C',fg:'#fff',freq:8,s:['Woodlawn','Mosholu Pkwy','Bedford Pk Blvd','Fordham Rd','167 St','161 St–Yankee Stad','149 St','138 St','125 St','86 St','59 St','42 St–Grand Central','28 St','23 St','14 St–Union Sq','Brooklyn Bridge','Fulton St','Wall St','Bowling Green','Borough Hall','Atlantic Ave','Crown Hts–Utica']},
+  {id:'5',c:'#00933C',fg:'#fff',freq:10,s:['Eastchester–Dyre Ave','Baychester Ave','Gun Hill Rd','Morris Park','Westchester Sq','Castle Hill Ave','Parkchester','3 Ave–149 St','138 St','125 St','86 St','59 St','42 St–Grand Central','14 St–Union Sq','Atlantic Ave']},
+  {id:'6',c:'#00933C',fg:'#fff',freq:7,s:['Pelham Bay Park','Westchester Sq','Castle Hill Ave','Parkchester','Morrison Ave','Elder Ave','Hunts Point Ave','3 Ave–149 St','125 St','116 St','103 St','96 St','86 St','77 St','68 St–Hunter College','59 St','51 St','42 St–Grand Central','33 St','28 St','23 St','14 St–Union Sq','Astor Pl','Bleecker St','Spring St','Canal St','Brooklyn Bridge']},
+  {id:'7',c:'#B933AD',fg:'#fff',freq:10,s:['Flushing–Main St','Mets–Willets Pt','Junction Blvd','90 St–Elmhurst','82 St–Jackson Hts','74 St–Jackson Hts','Queensboro Plz','Court Sq','Times Sq–42 St']},
+  {id:'A',c:'#0039A6',fg:'#fff',freq:12,s:['Inwood–207 St','Dyckman St','190 St','181 St','175 St','168 St','145 St','125 St','59 St–Columbus Cir','50 St','42 St–Port Authority','34 St–Penn Station','23 St','14 St','W 4 St','Spring St','Canal St','Fulton St','High St','Jay St–MetroTech','Atlantic Ave','Nostrand Ave','Far Rockaway']},
+  {id:'B',c:'#FF6319',fg:'#fff',freq:15,s:['Bedford Pk Blvd','Fordham Rd','182–183 Sts','167 St','155 St','145 St','125 St','96 St','81 St–Museum Nat Hist','72 St','59 St','42 St–Bryant Pk','34 St–Herald Sq','23 St','14 St','W 4 St','Broadway–Lafayette','Atlantic Ave','Church Ave','Brighton Beach','Coney Island']},
+  {id:'C',c:'#0039A6',fg:'#fff',freq:18,s:['168 St','163 St','155 St','145 St','125 St','110 St','103 St','96 St','86 St','81 St','72 St','59 St–Columbus Cir','50 St','42 St–Port Authority','34 St–Penn Station','23 St','14 St','W 4 St','Spring St','Canal St','Fulton St','Jay St–MetroTech']},
+  {id:'D',c:'#FF6319',fg:'#fff',freq:12,s:['Norwood–205 St','Bedford Pk Blvd','Fordham Rd','182–183 Sts','167 St','155 St','145 St','125 St','59 St','42 St–Bryant Pk','34 St–Herald Sq','23 St','14 St','W 4 St','Broadway–Lafayette','Grand St','Atlantic Ave','Church Ave','Kings Hwy','Coney Island']},
+  {id:'E',c:'#0039A6',fg:'#fff',freq:10,s:['Jamaica–179 St','Briarwood','Kew Gardens','Forest Hills–71 Ave','Jackson Hts–Roosevelt','Queens Plz','Lexington Ave–53 St','5 Ave–53 St','42 St–Port Authority','34 St–Penn Station','23 St','14 St','W 4 St','World Trade Center','Chambers St','Fulton St']},
+  {id:'F',c:'#FF6319',fg:'#fff',freq:10,s:['Jamaica–179 St','169 St','Briarwood','Kew Gardens','Forest Hills','Jackson Hts','Queens Plz','57 St','47–50 Sts–Rock Ctr','42 St–Bryant Pk','34 St–Herald Sq','23 St','14 St','W 4 St','Delancey–Essex St','Jay St–MetroTech','Bergen St','Church Ave','Kings Hwy','Coney Island']},
+  {id:'G',c:'#6CBE45',fg:'#fff',freq:12,s:['Court Sq','21 St–Queensbridge','Greenpoint Ave','Nassau Ave','Metropolitan Ave','Flushing Ave','Myrtle–Willoughby','Bedford–Nostrand','Classon Ave','Fulton St','Bergen St','Smith–9 Sts','4 Ave','Church Ave']},
+  {id:'J',c:'#996633',fg:'#fff',freq:15,s:['Jamaica Center','168 St','Jamaica–Van Wyck','Woodhaven Blvd','Cypress Hills','Crescent St','Broadway Jct','Halsey St','Gates Ave','Myrtle Ave','Flushing Ave','Lorimer St','Marcy Ave','Essex–Delancey St','Canal St','Chambers St','Fulton St','Broad St']},
+  {id:'L',c:'#A7A9AC',fg:'#000',freq:8,s:['Canarsie–Rockaway Pkwy','E 105 St','Pennsylvania Ave','Atlantic Ave','Broadway Jct','Wilson Ave','Bushwick Ave','Jefferson St','DeKalb Ave','Myrtle–Wyckoff','Seneca Ave','Forest Ave','8 Ave','6 Ave','1 Ave','3 Ave','14 St–Union Sq']},
+  {id:'M',c:'#FF6319',fg:'#fff',freq:12,s:['Middle Village–Metropolitan','Seneca Ave','Myrtle–Wyckoff','DeKalb Ave','Myrtle Ave','Flushing Ave','Lorimer St','Essex–Delancey St','Broadway–Lafayette','Spring St','23 St','34 St–Herald Sq','42 St–Bryant Pk','Lexington Ave–53 St']},
+  {id:'N',c:'#FCCC0A',fg:'#000',freq:10,s:['Astoria–Ditmars Blvd','Astoria Blvd','30 Ave','Broadway','36 Ave','Queensboro Plz','Lexington Ave–59 St','5 Ave–59 St','57 St–7 Ave','49 St','42 St–Times Sq','34 St–Herald Sq','28 St','23 St','14 St–Union Sq','Canal St','Whitehall–S Ferry','95 St']},
+  {id:'Q',c:'#FCCC0A',fg:'#000',freq:10,s:['96 St','86 St','72 St','57 St–7 Ave','49 St','42 St–Times Sq','34 St–Herald Sq','28 St','23 St','14 St–Union Sq','Canal St','DeKalb Ave','Atlantic Ave','Prospect Pk','Church Ave','Kings Hwy','Brighton Beach','Coney Island']},
+  {id:'R',c:'#FCCC0A',fg:'#000',freq:12,s:['Forest Hills–71 Ave','67 Ave','63 Dr','Woodhaven Blvd','Grand Ave','Elmhurst Ave','Jackson Hts','65 St','Queens Plz','Lexington Ave–59 St','5 Ave–53 St','57 St','49 St','42 St–Times Sq','34 St–Herald Sq','28 St','23 St','14 St–Union Sq','8 St–NYU','Prince St','Canal St','Rector St','Whitehall St','95 St']},
+  {id:'W',c:'#FCCC0A',fg:'#000',freq:12,s:['Whitehall–S Ferry','Cortlandt St','Rector St','Fulton St','Lexington Ave–59 St','57 St–7 Ave','49 St','42 St–Times Sq','Queensboro Plz','Astoria–Ditmars Blvd']},
+  {id:'Z',c:'#996633',fg:'#fff',freq:20,s:['Jamaica Center','Jamaica–Van Wyck','Woodhaven Blvd','Cypress Hills','Broadway Jct','Myrtle Ave','Marcy Ave','Essex–Delancey St','Broad St']},
+];
+
+// Station → Lines mapping (fixes multi-line logic)
+const STN_LINES = {};
+LINES.forEach(l=>l.s.forEach(s=>{
+  if(!STN_LINES[s]) STN_LINES[s]=[];
+  if(!STN_LINES[s].find(x=>x.id===l.id)) STN_LINES[s].push(l);
+}));
+
+// ══ GENERATE SAMPLE DATA (from real feature schema) ══
+const DATA = (()=>{
+  const rows=[];
+  LINES.forEach(line=>{
+    line.s.forEach((stop,seq)=>{
+      const reps=2+Math.floor(Math.random()*5);
+      for(let k=0;k<reps;k++){
+        const hour=Math.floor(Math.random()*24);
+        const isPeak=((hour>=7&&hour<=9)||(hour>=16&&hour<=18))?1:0;
+        const prev=Math.random()*520;
+        const rolling=prev*(0.68+Math.random()*.2);
+        const cumul=prev*(1.1+Math.random()*.25);
+        const pred=30+rolling*(37.7/100)*2.1+prev*(30.9/100)*2.1+seq*(11.7/100)*13+isPeak*75+(Math.random()-.32)*160;
+        const delay=Math.max(-60,Math.min(3600,Math.round(pred)));
+        rows.push({line:line.id,stop,seq,hour,isPeak,prev:Math.round(prev),rolling:Math.round(rolling),cumul:Math.round(cumul),delay,freq:line.freq});
+      }
+    });
+  });
+  return rows;
+})();
+
+let activeLines=new Set(LINES.map(l=>l.id));
+let lastRefresh=Date.now();
+
+// ══ FORMAT UTILS ══
+function fmtDelay(s){
+  if(s<=30) return 'On time';
+  if(s<60) return `${s}s`;
+  if(s<3600){ const m=Math.round(s/60); return `${m} min`; }
+  const h=Math.floor(s/3600), m=Math.round((s%3600)/60);
+  return m>0?`${h}h ${m}m`:`${h}h`;
+}
+function fmtTime(date){ return date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
+function addMins(date,mins){ return new Date(date.getTime()+mins*60000); }
+function addSecs(date,secs){ return new Date(date.getTime()+secs*1000); }
+
+const avg=arr=>arr.length?Math.round(arr.reduce((s,v)=>s+v,0)/arr.length):0;
+const pct=(n,t)=>t?Math.round(n/t*100):0;
+
+// ══ STATS ══
+function getStats(){
+  const all=DATA.map(r=>r.delay);
+  const severe=all.filter(d=>d>300);
+  const ontime=all.filter(d=>d<=120);
+  const peak=DATA.filter(r=>r.isPeak).map(r=>r.delay);
+  const off=DATA.filter(r=>!r.isPeak).map(r=>r.delay);
+  return{avg:avg(all),total:all.length,severe:severe.length,severePct:pct(severe.length,all.length),ontime:ontime.length,ontimePct:pct(ontime.length,all.length),peakAvg:avg(peak),offAvg:avg(off)};
+}
+
+function getTopStations(){
+  const map={};
+  DATA.filter(r=>activeLines.has(r.line)).forEach(r=>{
+    if(!map[r.stop]) map[r.stop]={stop:r.stop,delays:[],trips:0,seq:r.seq,freq:r.freq};
+    map[r.stop].delays.push(r.delay);
+    map[r.stop].trips++;
+  });
+  return Object.values(map).map(s=>({
+    stop:s.stop, avg:avg(s.delays), trips:s.trips, seq:s.seq, freq:s.freq,
+    lines:STN_LINES[s.stop]?.filter(l=>activeLines.has(l.id))||[],
+    severe:s.delays.filter(d=>d>300).length,
+    trafficLvl:s.trips>12?'High':s.trips>6?'Med':'Low'
+  })).sort((a,b)=>b.avg-a.avg).slice(0,22);
+}
+
+function getLineDelays(){
+  const map={};
+  DATA.forEach(r=>{if(!map[r.line])map[r.line]=[];map[r.line].push(r.delay);});
+  return Object.entries(map).filter(([id])=>activeLines.has(id))
+    .map(([id,arr])=>({id,avg:avg(arr),color:LINES.find(l=>l.id===id)?.c||'#888',fg:LINES.find(l=>l.id===id)?.fg||'#fff'}))
+    .sort((a,b)=>b.avg-a.avg).slice(0,12);
+}
+
+function getHourly(){
+  const b=Array.from({length:24},(_,h)=>({h,d:[]}));
+  DATA.forEach(r=>b[r.hour].d.push(r.delay));
+  return b.map(x=>({h:x.h,avg:avg(x.d)}));
+}
+
+// ══ RENDER KPIs ══
+function renderKPIs(){
+  const s=getStats();
+  document.getElementById('wPeak').textContent=fmtDelay(s.peakAvg);
+  document.getElementById('wOff').textContent=fmtDelay(s.offAvg);
+  document.getElementById('kpiStrip').innerHTML=[
+    {ico:'⏱',val:fmtDelay(s.avg),lbl:'Avg Delay',den:`across ${s.total.toLocaleString()} trips`,cls:'bl',badge:'EST',bcls:'b-nt'},
+    {ico:'🔴',val:s.severe.toLocaleString(),lbl:'Severe Delays',den:`${s.severePct}% of all trips (>5 min)`,cls:'rd',badge:'HIGH',bcls:'b-up'},
+    {ico:'✅',val:s.ontime.toLocaleString(),lbl:'On Time',den:`${s.ontimePct}% of trips ≤2 min delay`,cls:'gn',badge:'GOOD',bcls:'b-dn'},
+    {ico:'🏙',val:fmtDelay(s.peakAvg),lbl:'Rush Hour Avg',den:`vs ${fmtDelay(s.offAvg)} off-peak`,cls:'am',badge:'PEAK',bcls:'b-up'},
+  ].map(c=>`<div class="kpi ${c.cls}"><div class="kpi-badge ${c.bcls}">${c.badge}</div><div class="kpi-icon">${c.ico}</div><div class="kpi-val ${c.cls}">${c.val}</div><div class="kpi-lbl">${c.lbl}</div><div class="kpi-den">${c.den}</div></div>`).join('');
+}
+
+// ══ RENDER LINE GRID ══
+function renderLineGrid(){
+  document.getElementById('lineGrid').innerHTML=LINES.map(l=>`
+    <button class="lbtn" id="lb-${l.id}" onclick="toggleLine('${l.id}')" style="background:${l.c};color:${l.fg}" title="Line ${l.id}">
+      ${l.id}<div class="tt">Line ${l.id}</div>
+    </button>`).join('');
+}
+function toggleLine(id){
+  const btn=document.getElementById('lb-'+id);
+  if(activeLines.has(id)){activeLines.delete(id);btn.classList.add('off');}
+  else{activeLines.add(id);btn.classList.remove('off');}
+  renderMap();renderStations();renderLineChart();renderKPIs();
+}
+function selectAll(){LINES.forEach(l=>{activeLines.add(l.id);document.getElementById('lb-'+l.id)?.classList.remove('off');});renderMap();renderStations();renderLineChart();renderKPIs();}
+function clearAll(){LINES.forEach(l=>{activeLines.delete(l.id);document.getElementById('lb-'+l.id)?.classList.add('off');});renderMap();renderStations();renderLineChart();renderKPIs();}
+
+// ══ RENDER STATIONS ══
+function renderStations(){
+  const st=getTopStations();
+  document.getElementById('stnCount').textContent=st.length+' stations';
+  const now=new Date();
+  document.getElementById('stnList').innerHTML=st.map(s=>{
+    const cls=s.avg>300?'b-hi':s.avg>120?'b-med':'b-ok';
+    const lbl=s.avg>300?'SEVERE':s.avg>120?'DELAYED':'ON TIME';
+    const pills=s.lines.slice(0,3).map(l=>`<div class="stn-pill" style="background:${l.c};color:${l.fg}">${l.id}</div>`).join('');
+    const freqMins=s.lines[0]?.freq||10;
+    const nextSched=addMins(now,Math.floor(Math.random()*freqMins)+1);
+    const nextActual=addSecs(nextSched,s.avg);
+    return `<div class="stn-row" title="${s.stop}">
+      <div class="stn-lines">${pills}</div>
+      <div class="stn-info">
+        <div class="stn-name">${s.stop}</div>
+        <div class="stn-sub">Next: ${fmtTime(nextActual)} · ${s.trafficLvl} traffic · ${s.trips} trips</div>
+      </div>
+      <div class="stn-right">
+        <div class="stn-delay">${fmtDelay(s.avg)}</div>
+        <div class="stn-badge ${cls}">${lbl}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══ RENDER ARRIVAL BOARD ══
+function renderArrivalBoard(){
+  const now=new Date();
+  document.getElementById('arrivalTime').textContent='as of '+fmtTime(now);
+  const hubs=[
+    {stop:'42 St–Times Sq',lines:['1','2','3','7','N','Q','R','W']},
+    {stop:'42 St–Grand Central',lines:['4','5','6','7']},
+    {stop:'42 St–Port Authority',lines:['A','C','E']},
+    {stop:'42 St–Bryant Pk',lines:['B','D','F','M']},
+    {stop:'14 St–Union Sq',lines:['4','5','6','N','Q','R','W','L']},
+    {stop:'Atlantic Ave',lines:['B','D','N','Q','R','2','3','4','5']},
+    {stop:'Fulton St',lines:['A','C','2','3','4','5','J','Z']},
+    {stop:'Queensboro Plz',lines:['7','N','W']},
+    {stop:'Flushing–Main St',lines:['7']},
+    {stop:'Jamaica Center',lines:['J','Z']},
+  ];
+
+  const avgByStop={};
+  DATA.forEach(r=>{if(!avgByStop[r.stop])avgByStop[r.stop]=[];avgByStop[r.stop].push(r.delay);});
+
+  let html='';
+  hubs.filter(h=>h.lines.some(id=>activeLines.has(id))).slice(0,8).forEach(hub=>{
+    const arr=avgByStop[hub.stop]||[];
+    const avgDel=arr.length?avg(arr):Math.round(60+Math.random()*200);
+    const activeHubLines=hub.lines.filter(id=>activeLines.has(id));
+    if(!activeHubLines.length)return;
+    const lineId=activeHubLines[0];
+    const lineObj=LINES.find(l=>l.id===lineId)||LINES[0];
+    const freq=lineObj.freq||10;
+    const minsToNext=Math.floor(Math.random()*(freq-1))+1;
+    const scheduledNext=addMins(now,minsToNext);
+    const actualNext=addSecs(scheduledNext,avgDel);
+    const isLate=avgDel>120;
+    const statusCls=avgDel>300?'abs-late':avgDel>120?'abs-mod':'abs-ok';
+    const statusTxt=avgDel>300?`+${fmtDelay(avgDel)}`:avgDel>120?`+${fmtDelay(avgDel)}`:'On time';
+    html+=`<div class="ab-row">
+      <div class="ab-pill" style="background:${lineObj.c};color:${lineObj.fg}">${lineId}</div>
+      <div class="ab-station">${hub.stop}</div>
+      <div class="ab-time">${fmtTime(actualNext)}</div>
+      <div class="ab-status ${statusCls}">${statusTxt}</div>
+    </div>`;
+  });
+  document.getElementById('arrivalBoard').innerHTML=html||'<div style="color:#64748b;font-size:10px;text-align:center;padding:8px">No active lines selected</div>';
+}
+
+// ══ LINE CHART ══
+function renderLineChart(){
+  const data=getLineDelays(),max=Math.max(...data.map(d=>d.avg),1);
+  document.getElementById('lineChart').innerHTML=data.map(d=>`
+    <div class="bar-row">
+      <div class="bar-lbl" style="color:${d.color}">Line ${d.id}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(d.avg/max*100).toFixed(1)}%;background:${d.color}22;border-left:3px solid ${d.color};color:${d.color}">${d.avg>80?fmtDelay(d.avg):''}</div></div>
+      <div class="bar-num">${fmtDelay(d.avg)}</div>
+    </div>`).join('');
+}
+
+// ══ FEATURE CHART (REAL) ══
+function renderFeatures(){
+  const max=Math.max(...Object.values(FEAT_IMPORTANCE));
+  document.getElementById('featChart').innerHTML=Object.entries(FEAT_IMPORTANCE).map(([k,v])=>`
+    <div class="bar-row" title="${FEAT_DESC[k]}">
+      <div class="bar-lbl" title="${FEAT_DESC[k]}">${k}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${v<1?'2%':(v/max*100).toFixed(1)+'%'};background:${FEAT_COLORS[k]}22;border-left:3px solid ${v<1?'#e2e8f0':FEAT_COLORS[k]};color:${v<1?'var(--muted2)':FEAT_COLORS[k]}">${v>8?v+'%':''}</div></div>
+      <div class="bar-num" style="color:${v<1?'var(--muted2)':'inherit'}">${v}%</div>
+    </div>`).join('');
+}
+
+// ══ HOURLY CHART ══
+function renderHourly(){
+  const data=getHourly(),max=Math.max(...data.map(d=>d.avg),1);
+  const W=820,H=88,pad=8;
+  const pts=data.map((d,i)=>({x:pad+(i/23)*(W-2*pad),y:H-pad-(d.avg/max)*(H-2*pad-8),avg:d.avg,h:i}));
+  const isPk=h=>(h>=7&&h<=9)||(h>=16&&h<=18);
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const gc=isDark?'#1e293b':'#e2ecf8';
+  let rects='';
+  [[7,9],[16,18]].forEach(([s,e])=>{
+    const x1=pad+(s/23)*(W-2*pad),x2=pad+(e/23)*(W-2*pad);
+    rects+=`<rect x="${x1}" y="${pad}" width="${x2-x1}" height="${H-2*pad}" fill="#dc262613" rx="3"/>`;
+    rects+=`<text x="${x1+3}" y="${pad+9}" font-family="IBM Plex Mono" font-size="8" font-weight="600" fill="#dc2626" opacity=".8">${s===7?'AM PEAK':'PM PEAK'}</text>`;
+  });
+  const lp=`M ${pts.map(p=>`${p.x},${p.y}`).join(' L ')}`;
+  const ap=`M ${pts[0].x},${H-pad} L ${pts.map(p=>`${p.x},${p.y}`).join(' L ')} L ${pts[pts.length-1].x},${H-pad} Z`;
+  const yLabels=[100,200,300].map(v=>{
+    const y=H-pad-(v/max)*(H-2*pad-8);
+    return `<line x1="${pad}" y1="${y}" x2="${W-30}" y2="${y}" stroke="${gc}" stroke-width=".8"/><text x="${W-28}" y="${y+3}" font-family="IBM Plex Mono" font-size="7" fill="#94a3b8">${fmtDelay(v)}</text>`;
+  }).join('');
+  document.getElementById('areaChart').innerHTML=`
+    <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2d7dd2" stop-opacity=".2"/><stop offset="100%" stop-color="#2d7dd2" stop-opacity=".02"/></linearGradient></defs>
+    ${yLabels}${rects}
+    <path d="${ap}" fill="url(#ag)"/>
+    <path d="${lp}" fill="none" stroke="#2d7dd2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="${isPk(p.h)?4.5:2.5}" fill="${isPk(p.h)?'#dc2626':'#2d7dd2'}" stroke="${isPk(p.h)?'#fecaca':'#bfdbfe'}" stroke-width="1.5"><title>${p.h}:00 — avg ${fmtDelay(p.avg)}${isPk(p.h)?' ⚠️ PEAK':''}</title></circle>`).join('')}`;
+}
+
+// ══ ALERTS ══
+function renderAlerts(){
+  const top=getTopStations();
+  const severe=top.filter(s=>s.avg>300).slice(0,3);
+  const mod=top.filter(s=>s.avg>120&&s.avg<=300).slice(0,2);
+  const all=[
+    ...severe.map(s=>({cls:'hi',ico:'🚨',msg:`Severe delay — ${s.lines.slice(0,2).map(l=>`Line ${l.id}`).join(', ')}`,sub:`${s.stop} · avg ${fmtDelay(s.avg)} · ${s.severe} severe trips`,act:'Allow extra time or take alternate route'})),
+    ...mod.map(s=>({cls:'med',ico:'⚠️',msg:`Slow service — ${s.lines.slice(0,2).map(l=>`Line ${l.id}`).join(', ')}`,sub:`${s.stop} · avg ${fmtDelay(s.avg)} delay`,act:'Consider off-peak travel if flexible'})),
+    {cls:'inf',ico:'ℹ️',msg:'Rush hour delays expected',sub:'Mon–Fri 7–9 AM & 4–6 PM · All IRT lines',act:null},
+  ];
+  document.getElementById('alertList').innerHTML=all.map(a=>`<div class="alert ${a.cls}"><div class="alert-ico">${a.ico}</div><div style="flex:1"><div class="alert-msg">${a.msg}</div><div class="alert-sub">${a.sub}</div>${a.act?`<div class="alert-act">→ ${a.act}</div>`:''}</div></div>`).join('');
+  document.getElementById('alertCount').textContent=severe.length+' critical';
+}
+
+// ══ RIBBON ══
+function renderRibbon(){
+  const top=getTopStations().slice(0,14);
+  const items=top.filter(s=>s.lines[0]).map(s=>`<div class="r-item"><span class="r-pill" style="background:${s.lines[0].c};color:${s.lines[0].fg}">${s.lines[0].id}</span>${s.stop} · <strong>${fmtDelay(s.avg)}</strong></div>`);
+  document.getElementById('ribbonInner').innerHTML=[...items,...items].join('');
+}
+
+// ══ POPULATE DROPDOWNS ══
+function populateDropdowns(){
+  const all=[...new Set(DATA.map(r=>r.stop))].sort().slice(0,80);
+  const opts=all.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('tpFrom').innerHTML=opts;
+  document.getElementById('tpTo').innerHTML=opts;
+  // Default different from/to
+  document.getElementById('tpFrom').value=all[0];
+  document.getElementById('tpTo').value=all[Math.min(10,all.length-1)];
+}
+
+// ══ TRIP PLANNER (with expected arrival times) ══
+function planTrip(){
+  const from=document.getElementById('tpFrom').value;
+  const to=document.getElementById('tpTo').value;
+  const hour=parseInt(document.getElementById('tpHour').value)||8;
+  const isWeekend=document.getElementById('tpDay').value==='weekend';
+  const isPeak=!isWeekend&&((hour>=7&&hour<=9)||(hour>=16&&hour<=18));
+  if(from===to){alert('Please select different stations.');return;}
+
+  // Find common lines
+  const fromLines=STN_LINES[from]?.map(l=>l.id)||[];
+  const toLines=STN_LINES[to]?.map(l=>l.id)||[];
+  const common=fromLines.filter(id=>toLines.includes(id)&&activeLines.has(id));
+
+  // Pick best line
+  let bestLine=null, requiresTransfer=false;
+  if(common.length>0){
+    bestLine=LINES.find(l=>l.id===common[0]);
+  } else if(fromLines.length>0&&activeLines.has(fromLines[0])){
+    bestLine=LINES.find(l=>l.id===fromLines[0]);
+    requiresTransfer=true;
+  }
+  if(!bestLine){
+    document.getElementById('tpRec').textContent='No active lines serve these stations';
+    document.getElementById('tpResult').classList.add('show');
+    document.getElementById('tpDetail').innerHTML='';
+    document.getElementById('tpWarn').style.display='none';
+    return;
+  }
+
+  // Compute delay prediction using real feature weights
+  const fromSeq=bestLine.s.indexOf(from);
+  const toSeq=bestLine.s.indexOf(to);
+  const stops=Math.abs(toSeq-fromSeq)||5;
+  const prev=Math.random()*300;
+  const rolling=prev*0.75;
+  const predDelay=Math.max(0,Math.round(
+    rolling*(37.7/100)*2.1+prev*(30.9/100)*2.1+
+    fromSeq*(11.7/100)*13+hour*(4.7/100)*18+
+    (isPeak?75:0)+(Math.random()-.4)*50+25
+  ));
+
+  const now=new Date();
+  const travelBase=Math.round(stops*2.5);
+  const schedDepart=addMins(now,Math.floor(Math.random()*bestLine.freq)+1);
+  const actualDepart=addSecs(schedDepart,predDelay);
+  const schedArrive=addMins(schedDepart,travelBase);
+  const actualArrive=addSecs(schedArrive,predDelay);
+  const isLate=predDelay>120;
+
+  document.getElementById('tpRec').textContent=`🚇 Take Line ${bestLine.id}${requiresTransfer?' (transfer needed)':''}`;
+
+  const rows=[
+    {k:'Scheduled Depart',v:fmtTime(schedDepart)},
+    {k:'Expected Depart',v:fmtTime(actualDepart),cls:isLate?'late':'ok'},
+    {k:'Scheduled Arrive',v:fmtTime(schedArrive)},
+    {k:'Expected Arrive',v:fmtTime(actualArrive),cls:isLate?'late':'ok'},
+    {k:'Predicted Delay',v:fmtDelay(predDelay),cls:predDelay>300?'late':predDelay>120?'':'ok'},
+    {k:'Travel Time',v:`~${travelBase} min (${stops} stops)`},
+    {k:'Rush Hour',v:isPeak?'Yes — expect more delays':'No'},
+  ];
+  document.getElementById('tpDetail').innerHTML=rows.map(r=>
+    `<div class="tp-drow"><span class="tp-dkey">${r.k}</span><span class="tp-dval ${r.cls||''}">${r.v}</span></div>`
+  ).join('');
+
+  const warn=document.getElementById('tpWarn');
+  if(isPeak){warn.textContent='⚠️ Peak hour travel. Trains may run '+fmtDelay(predDelay)+' late. Allow extra buffer.';warn.style.display='block';}
+  else if(requiresTransfer){warn.textContent='ℹ️ No direct line found. Transfer may be needed.';warn.style.display='block';}
+  else{warn.style.display='none';}
+
+  document.getElementById('tpResult').classList.remove('show');
+  setTimeout(()=>document.getElementById('tpResult').classList.add('show'),50);
+}
+
+// ══ MAP (proper schematic, NO moving trains, station tooltips) ══
+const MAP_SEGS=[
+  {ids:['1','2','3'],c:'#EE352E',p:'M 388 14 L 388 340',sts:[
+    {n:'125 St',x:388,y:52},{n:'96 St',x:388,y:82},{n:'72 St',x:388,y:110},{n:'59 St–Columbus Cir',x:388,y:136},
+    {n:'42 St–Times Sq',x:388,y:165},{n:'34 St–Penn Station',x:388,y:190},{n:'14 St',x:388,y:224},
+    {n:'Chambers St',x:388,y:276},{n:'South Ferry',x:388,y:334}]},
+  {ids:['4','5','6'],c:'#00933C',p:'M 496 14 L 496 308',sts:[
+    {n:'125 St',x:496,y:50},{n:'86 St',x:496,y:84},{n:'59 St',x:496,y:116},
+    {n:'42 St–Grand Central',x:496,y:152},{n:'28 St',x:496,y:180},
+    {n:'14 St–Union Sq',x:496,y:213},{n:'Brooklyn Bridge',x:496,y:290}]},
+  {ids:['N','Q','R','W'],c:'#FCCC0A',p:'M 612 14 C 574 68 500 112 448 165 L 448 338',sts:[
+    {n:'Queensboro Plz',x:590,y:43},{n:'Lexington Ave–59 St',x:544,y:93},
+    {n:'5 Ave–59 St',x:518,y:116},{n:'57 St–7 Ave',x:490,y:140},
+    {n:'42 St–Times Sq',x:452,y:165},{n:'34 St–Herald Sq',x:452,y:194},
+    {n:'23 St',x:452,y:220},{n:'14 St–Union Sq',x:452,y:247},
+    {n:'Canal St',x:452,y:296},{n:'Whitehall–S Ferry',x:452,y:336}]},
+  {ids:['A','C','E'],c:'#0039A6',p:'M 294 14 L 294 338',sts:[
+    {n:'59 St–Columbus Cir',x:294,y:76},{n:'50 St',x:294,y:101},
+    {n:'42 St–Port Authority',x:294,y:130},{n:'34 St–Penn Station',x:294,y:158},
+    {n:'23 St',x:294,y:187},{n:'14 St',x:294,y:216},
+    {n:'W 4 St',x:294,y:249},{n:'World Trade Center',x:294,y:302},{n:'Fulton St',x:294,y:336}]},
+  {ids:['B','D','F','M'],c:'#FF6319',p:'M 342 14 L 342 338',sts:[
+    {n:'47–50 Sts–Rock Ctr',x:342,y:76},{n:'42 St–Bryant Pk',x:342,y:113},
+    {n:'34 St–Herald Sq',x:342,y:148},{n:'23 St',x:342,y:181},
+    {n:'14 St',x:342,y:212},{n:'W 4 St',x:342,y:247},
+    {n:'Broadway–Lafayette',x:342,y:286},{n:'Grand St',x:342,y:328}]},
+  {ids:['7'],c:'#B933AD',p:'M 294 130 L 692 130',sts:[
+    {n:'Times Sq–42 St',x:388,y:130},{n:'Queensboro Plz',x:496,y:130},
+    {n:'74 St–Jackson Hts',x:584,y:130},{n:'Flushing–Main St',x:688,y:130}]},
+  {ids:['L'],c:'#A7A9AC',p:'M 184 213 L 534 213',sts:[
+    {n:'8 Ave',x:184,y:213},{n:'6 Ave',x:222,y:213},{n:'14 St–Union Sq',x:388,y:213},
+    {n:'3 Ave',x:428,y:213},{n:'1 Ave',x:466,y:213},{n:'Canarsie–Rockaway Pkwy',x:530,y:213}]},
+  {ids:['G'],c:'#6CBE45',p:'M 496 213 L 496 352',sts:[
+    {n:'Court Sq',x:496,y:235},{n:'Greenpoint Ave',x:496,y:268},
+    {n:'Nassau Ave',x:496,y:300},{n:'Bergen St',x:496,y:340}]},
+  {ids:['J','Z'],c:'#996633',p:'M 496 290 L 706 290',sts:[
+    {n:'Fulton St',x:496,y:290},{n:'Broadway Jct',x:584,y:290},{n:'Jamaica Center',x:702,y:290}]},
+  {ids:['4','5'],c:'#00933C',p:'M 496 14 L 620 14',sts:[{n:'Fordham Rd',x:556,y:14},{n:'Woodlawn',x:616,y:14}]},
+  {ids:['1','2'],c:'#EE352E',p:'M 388 14 L 246 14',sts:[{n:'207 St',x:328,y:14},{n:'Van Cortlandt Pk',x:248,y:14}]},
+  {ids:['D'],c:'#FF6319',p:'M 342 14 L 200 14',sts:[{n:'Fordham Rd',x:265,y:14},{n:'Norwood–205 St',x:202,y:14}]},
+  {ids:['2'],c:'#EE352E',p:'M 388 340 C 424 354 472 360 556 360',sts:[{n:'Atlantic Ave',x:428,y:354},{n:'Crown Hts–Utica',x:510,y:360}]},
+  {ids:['F','Q'],c:'#FF6319',p:'M 342 328 C 362 350 414 360 480 360 L 556 360',sts:[{n:'Church Ave',x:378,y:356},{n:'Coney Island',x:506,y:360}]},
+  {ids:['A'],c:'#0039A6',p:'M 294 338 L 294 360 L 200 360',sts:[{n:'Far Rockaway',x:202,y:360},{n:'Jay St–MetroTech',x:252,y:352}]},
+];
+
+let delayCache={};
+function buildCache(){
+  delayCache={};
+  DATA.filter(r=>activeLines.has(r.line)).forEach(r=>{
+    if(!delayCache[r.stop])delayCache[r.stop]=[];
+    delayCache[r.stop].push(r.delay);
+  });
+}
+function getStnDelay(n){const a=delayCache[n];return a?avg(a):Math.round(70+Math.random()*230);}
+
+function renderMap(){
+  buildCache();
+  const svg=document.getElementById('subwayMap');
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const bgC=isDark?'#111827':'#f0f7ff';
+  const gridC=isDark?'#1e2a3a':'#d4e4f5';
+  const boroughC=isDark?'#2d3a52':'#c3d5e8';
+
+  let h=`<defs>
+    <filter id="gl"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="sg"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="mapbg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${isDark?'#111827':'#eef5ff'}"/>
+      <stop offset="100%" stop-color="${isDark?'#0d1117':'#e4edf9'}"/>
+    </linearGradient>
+  </defs>
+  <rect width="820" height="370" fill="url(#mapbg)" rx="8"/>`;
+
+  // Subtle background grid (reduced opacity)
+  for(let x=70;x<820;x+=80) h+=`<line x1="${x}" y1="0" x2="${x}" y2="370" stroke="${gridC}" stroke-width=".5" opacity=".4"/>`;
+  for(let y=45;y<370;y+=55) h+=`<line x1="0" y1="${y}" x2="820" y2="${y}" stroke="${gridC}" stroke-width=".5" opacity=".4"/>`;
+
+  // Borough shapes (subtle outlines)
+  h+=`<rect x="150" y="10" width="380" height="350" fill="none" stroke="${boroughC}" stroke-width="1" stroke-dasharray="8,6" rx="4" opacity=".35"/>`;
+  h+=`<rect x="534" y="10" width="270" height="200" fill="none" stroke="${boroughC}" stroke-width="1" stroke-dasharray="8,6" rx="4" opacity=".35"/>`;
+  h+=`<rect x="150" y="330" width="380" height="36" fill="none" stroke="${boroughC}" stroke-width="1" stroke-dasharray="8,6" rx="4" opacity=".35"/>`;
+
+  // Borough labels
+  [{l:'MANHATTAN',x:335,y:368},{l:'QUEENS',x:668,y:155},{l:'BRONX',x:420,y:9},{l:'BROOKLYN',x:388,y:378}].forEach(b=>{
+    h+=`<text x="${b.x}" y="${b.y}" text-anchor="middle" fill="${boroughC}" font-family="IBM Plex Mono" font-size="8.5" letter-spacing="2.5" font-weight="600">${b.l}</text>`;
+  });
+
+  // Draw segments
+  MAP_SEGS.forEach((seg,i)=>{
+    const active=seg.ids.some(id=>activeLines.has(id));
+    const lineColor=active?seg.c:'#aaa';
+    const opacity=active?.88:.22;
+    h+=`<path d="${seg.p}" fill="none" stroke="${lineColor}" stroke-width="${active?4.5:2}" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}"/>`;
+
+    if(!active)return;
+    seg.sts.forEach(st=>{
+      const d=getStnDelay(st.n);
+      const dc=d>300?'#dc2626':d>120?'#b45309':'#15803d';
+      const rc=d>300?7:d>120?5.5:4;
+      const allLines=STN_LINES[st.n]?.filter(l=>activeLines.has(l.id)).map(l=>l.id).join('/  ')||seg.ids[0];
+      const tip=`${st.n}  |  Lines: ${allLines}  |  Avg delay: ${fmtDelay(d)}  |  ${d>300?'⚠️ SEVERE':d>120?'⏱ DELAYED':'✅ ON TIME'}`;
+      // Pulse ring for severe stations
+      if(d>300){h+=`<circle cx="${st.x}" cy="${st.y}" r="${rc+5}" fill="#dc2626" opacity=".12"><animate attributeName="r" values="${rc+2};${rc+10};${rc+2}" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".15;0;.15" dur="2s" repeatCount="indefinite"/></circle>`;}
+      h+=`<circle cx="${st.x}" cy="${st.y}" r="${rc}" fill="${dc}" stroke="white" stroke-width="2" filter="url(#gl)" opacity=".95" data-tip="${tip}" class="mstn" style="cursor:pointer"/>`;
+      // Only show label if delay > 195s to avoid clutter
+      if(d>195)h+=`<text x="${st.x+rc+3}" y="${st.y+4}" fill="${dc}" font-family="IBM Plex Mono" font-size="8" font-weight="600" opacity=".9" pointer-events="none">${fmtDelay(d)}</text>`;
+    });
+  });
+
+  // Line ID labels at top of each trunk
+  [{id:'A/C/E',x:294,c:'#0039A6'},{id:'B/D/F/M',x:342,c:'#FF6319'},{id:'1/2/3',x:388,c:'#EE352E'},
+   {id:'N/Q/R/W',x:452,c:'#FCCC0A'},{id:'4/5/6',x:496,c:'#00933C'}].forEach(ll=>{
+    if(!ll.id.split('/').some(i=>activeLines.has(i)))return;
+    h+=`<text x="${ll.x}" y="380" text-anchor="middle" font-family="IBM Plex Mono" font-size="8" font-weight="700" fill="${ll.c}" opacity=".8">${ll.id}</text>`;
+  });
+
+  // Cross-connection dashes (transfer lines)
+  ['M 184 165 L 710 165','M 184 213 L 534 213','M 184 290 L 534 290'].forEach(d=>{
+    h+=`<path d="${d}" fill="none" stroke="${isDark?'#2d3a52':'#94a3b8'}" stroke-width=".7" stroke-dasharray="4,6" opacity=".28"/>`;
+  });
+
+  svg.innerHTML=h;
+
+  // Attach hover tooltips
+  setTimeout(()=>{
+    svg.querySelectorAll('.mstn').forEach(el=>{
+      const tip=el.getAttribute('data-tip');
+      el.addEventListener('mouseenter',()=>{
+        const tt=document.getElementById('mtt');
+        tt.innerHTML=tip.replace('  |  ','<br>').replace('  |  ','<br>').replace('  |  ','<br>');
+        tt.style.display='block';
+      });
+      el.addEventListener('mousemove',e=>{
+        const tt=document.getElementById('mtt');
+        tt.style.left=(e.clientX+14)+'px';
+        tt.style.top=(e.clientY-32)+'px';
+      });
+      el.addEventListener('mouseleave',()=>{ document.getElementById('mtt').style.display='none'; });
+    });
+  },80);
+}
+
+// ══ LAST UPDATED ══
+function updateTS(){
+  const secs=Math.round((Date.now()-lastRefresh)/1000);
+  const el=document.getElementById('tsChip');
+  const m=Math.floor(secs/60);
+  el.textContent=secs<60?'Updated just now':m===1?'1 min ago':`${m} min ago`;
+  el.classList.toggle('stale',m>=15);
+}
+
+// ══ REFRESH ══
+function doRefresh(){
+  const rIcon=document.getElementById('rIcon'),sp=document.getElementById('spinner'),rb=document.getElementById('refreshBtn');
+  rIcon.style.display='none';sp.classList.add('on');rb.disabled=true;
+  DATA.forEach(r=>{r.delay=Math.max(-60,r.delay+Math.round((Math.random()-.5)*45));});
+  setTimeout(()=>{
+    renderAll();lastRefresh=Date.now();
+    rIcon.style.display='';sp.classList.remove('on');rb.disabled=false;
+    document.querySelectorAll('.kpi,.card').forEach(c=>{c.classList.add('flash');setTimeout(()=>c.classList.remove('flash'),600);});
+  },700);
+}
+
+// ══ DARK MODE ══
+function toggleTheme(){
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',isDark?'light':'dark');
+  document.getElementById('themeBtn').textContent=isDark?'🌙':'☀️';
+  renderMap();renderHourly();
+}
+
+// ══ CLOCK ══
+setInterval(()=>{ document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false}); },1000);
+setInterval(updateTS,20000);
+
+// ══ RENDER ALL ══
+function renderAll(){
+  renderKPIs();renderMap();renderHourly();renderStations();
+  renderLineChart();renderAlerts();renderRibbon();renderArrivalBoard();
+}
+
+// ══ AUTO REFRESH (12s) ══
+setInterval(()=>{
+  DATA.forEach(r=>{r.delay=Math.max(-60,r.delay+Math.round((Math.random()-.5)*38));});
+  renderKPIs();renderMap();renderStations();renderAlerts();renderRibbon();renderArrivalBoard();renderLineChart();
+  lastRefresh=Date.now();
+},12000);
+
+// ══ INIT ══
+window.addEventListener('DOMContentLoaded',()=>{
+  renderLineGrid();renderFeatures();populateDropdowns();renderAll();
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false});
+});
+</script>
+</body>
+</html>
