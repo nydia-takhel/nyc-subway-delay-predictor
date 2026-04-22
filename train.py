@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import json
+import joblib
 
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
@@ -43,7 +45,6 @@ y = df['delay']
 # ==============================
 # FEATURES (SAFE)
 # ==============================
-# X = df.drop(columns=leakage_cols)
 drop_cols = [
     'delay',
     'actual_sec',
@@ -84,19 +85,11 @@ print("MAE:", mean_absolute_error(y_test, baseline))
 print("RMSE:", np.sqrt(mean_squared_error(y_test, baseline)))
 print("R2:", r2_score(y_test, baseline))
 
-
 # ==============================
 # MODELS
 # ==============================
 models = {
-    # "Linear": LinearRegression(),
-    # "Ridge": Ridge(alpha=1.0),
-    # "Lasso": Lasso(alpha=0.1),
-    # "RandomForest": RandomForestRegressor(n_estimators=20, max_depth=8),
-    # "ExtraTrees": ExtraTreesRegressor(n_estimators=20),
-    # "GradientBoosting": GradientBoostingRegressor(n_estimators=20),
     "XGBoost": XGBRegressor(n_estimators=20, max_depth=5),
-    # "LightGBM": LGBMRegressor(n_estimators=20)
 }
 
 results = []
@@ -121,7 +114,6 @@ for name, model in models.items():
     print("RMSE:", rmse)
     print("R2:", r2)
 
-
 # ==============================
 # RESULTS TABLE
 # ==============================
@@ -130,11 +122,73 @@ results_df = pd.DataFrame(results, columns=["Model", "MAE", "RMSE", "R2"])
 print("\n📊 FINAL MODEL COMPARISON")
 print(results_df.sort_values(by="RMSE"))
 
-# SAVE RESULTS
-results_df.to_csv("model_results.csv", index=False)
-
-print("\n🏆 Best Model:")
-print(results_df.sort_values(by="RMSE").iloc[0])
-
-import joblib
+# ==============================
+# SAVE MODEL
+# ==============================
 joblib.dump(model, "xgboost_model.pkl")
+print("✅ Model saved: xgboost_model.pkl")
+
+# ==============================
+# EXTRACT FEATURE IMPORTANCE
+# ==============================
+# Get feature names (in order)
+feature_names = X.columns.tolist()
+print(f"\nFeatures used: {feature_names}")
+
+# Get importance from XGBoost
+importance_scores = model.get_booster().get_score(importance_type='weight')
+
+# Create a dict with feature names
+feature_importance = {}
+for feature in feature_names:
+    feature_importance[feature] = importance_scores.get(feature, 0)
+
+# Normalize to percentages
+total_importance = sum(feature_importance.values())
+if total_importance > 0:
+    feature_importance = {
+        k: round((v / total_importance) * 100, 1) 
+        for k, v in feature_importance.items()
+    }
+else:
+    # Fallback if no importance scores (shouldn't happen)
+    feature_importance = {feat: round(100/len(feature_names), 1) for feat in feature_names}
+
+# Sort by importance (descending)
+feature_importance = dict(sorted(
+    feature_importance.items(), 
+    key=lambda x: x[1], 
+    reverse=True
+))
+
+print("\n🧠 Feature Importance:")
+for feat, imp in feature_importance.items():
+    print(f"  {feat}: {imp}%")
+
+# Save to JSON
+with open('feature_importance.json', 'w') as f:
+    json.dump(feature_importance, f, indent=2)
+
+print("✅ Feature importance saved: feature_importance.json")
+
+# ==============================
+# SAVE RESULTS
+# ==============================
+results_df.to_csv("model_results.csv", index=False)
+print("✅ Results saved: model_results.csv")
+
+# ==============================
+# PRINT FINAL SUMMARY
+# ==============================
+print("\n" + "="*60)
+print("🎯 TRAINING COMPLETE")
+print("="*60)
+print(f"\n📊 Best Model: {results_df.iloc[0]['Model']}")
+print(f"   R² Score: {results_df.iloc[0]['R2']:.4f}")
+print(f"   MAE: {results_df.iloc[0]['MAE']:.2f} seconds")
+print(f"   RMSE: {results_df.iloc[0]['RMSE']:.2f} seconds")
+print(f"\n📁 Files generated:")
+print(f"   • xgboost_model.pkl (trained model)")
+print(f"   • feature_importance.json (feature weights)")
+print(f"   • model_results.csv (metrics)")
+print("="*60 + "\n")
