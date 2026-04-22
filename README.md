@@ -1,254 +1,133 @@
-🚇 NYC Subway Delay Prediction System
-📌 Project Overview
+# 🚇 NYC Subway Delay Predictor
 
-This project presents a machine learning-based system for predicting subway delays in the New York City transit network. Using historical operational data and GTFS (General Transit Feed Specification) datasets, the system models delay propagation across stations and provides an interactive web-based dashboard for users.
+## 📌 Overview
 
-The system includes:
+Urban transit systems often break down under real-world conditions—delays cascade, schedules become unreliable, and official estimates lose accuracy.
 
-Data preprocessing pipeline
-Feature engineering for temporal and sequential patterns
-XGBoost regression model
-Flask-based deployment
-Interactive delay prediction dashboard
-🎯 Problem Statement
+This project builds a machine learning system to **predict subway delays under irregular service conditions**, focusing on how delays propagate across time rather than relying solely on static schedules.
 
-Subway delays significantly affect urban mobility and commuter experience. Delays are not isolated events; they propagate across stations due to operational dependencies.
+---
 
-This project formulates delay prediction as a supervised regression problem:
+## 🎯 Problem Statement
 
-y^=f(X)
+Existing platforms (e.g., Metropolitan Transportation Authority and Google) primarily provide:
 
-Where:
+* real-time tracking
+* schedule-based estimates
 
-X: input features (time, previous delay, sequence position)
-y^: predicted delay (in seconds)
-📊 Data Sources
+However, during disruptions:
 
-The model is built using transit data from:
+* trains bunch together
+* delays propagate unpredictably
+* arrival estimates become unreliable
 
-1. Realtime Operational Data
-Actual train arrival times
-Trip and stop-level information
-2. GTFS Dataset
-stops.txt → station names and metadata
-stop_times.txt → scheduled arrival times
-trips.txt, routes.txt → route structure
-📐 Delay Calculation
-Delay=Actual Arrival Time−Scheduled Arrival Time
-Example:
-Scheduled: 08:00
-Actual: 08:02
-Delay=120 seconds
-🧹 Data Preprocessing
+👉 This project addresses that gap by modeling **delay dynamics and sequential patterns**.
 
-Key preprocessing steps:
+---
 
-Removal of duplicate entries
-Timestamp conversion to numeric format
-Normalization of station identifiers (stop_id)
-Merging real-time and scheduled datasets
-Outlier filtering:
-Valid delay range: [-600, 3600] seconds
-⚠️ Memory Optimization
+## 💡 Key Idea
 
-Due to large dataset size, sampling (~300,000 rows) was applied for efficient training.
+Instead of asking:
 
-⚙️ Feature Engineering
+> “What is the scheduled arrival time?”
 
-Feature engineering focuses on capturing temporal patterns and delay propagation behavior.
+This model asks:
 
-🕒 Time-Based Features
-hour → hour of day
-is_peak → rush hour indicator
+> “Given what just happened, what will happen next?”
 
-is_peak={1; if hour ∈ [7–9, 16–18] and 0 otherwise
-	​
+It leverages:
 
-🔁 Sequential Features
+* temporal patterns (time of day, weekday/weekend)
+* sequential dependencies (previous train delays, headways)
 
-These capture how delays evolve over time:
+---
 
-Previous Delay
-dt−1
-	​
+## ⚙️ Features
 
-Rolling Delay
-3
-d
-t−2
-	​
+### ⏱ Temporal Features
 
-+d
-t−1
-	​
+* Hour of day (rush hour vs off-peak)
+* Day of week
+* Weekend vs weekday patterns
 
-+d
-t
-	​
+### 🔁 Sequential Features (Core Strength)
 
-	​
+* Previous train delay
+* Time since last train (headway)
+* Rolling delay trends (lag features)
 
-Cumulative Delay
-∑d
-i
-	​
+👉 These features allow the model to capture **delay propagation**, which is often ignored in basic approaches.
 
-📌 Example
-Station	Delay (sec)
-A	100
-B	150
-C	200
-Rolling delay at C = 150
-Cumulative delay at C = 450
-⚠️ Challenges & Solutions
-❌ Data Leakage
+---
 
-Issue: Model used future information (e.g., actual timestamps)
+## 🧠 Model Approach
 
-Fix: Removed:
+The project follows a progressive modeling strategy:
 
-actual_sec
-scheduled_sec
-arrival time columns
-❌ Memory Constraints
+1. Baseline (historical averages)
+2. XGbBoost
 
-Issue: Large dataset caused memory errors
+The goal is to **quantify the predictive power of sequential signals**.
 
-Fix: Sampling + optimized processing
+---
 
-❌ Stop ID Mismatch
+## 📊 Evaluation
 
-Issue: stop_id stored inconsistently
+Model performance is evaluated using:
 
-Fix:
+* Mean Absolute Error (MAE)
+* Root Mean Squared Error (RMSE)
 
-stops_df["stop_id"] = stops_df["stop_id"].astype(str)
-❌ File Path Errors
+Additionally, predictions can be compared against:
 
-Issue: Incorrect dataset paths
+* baseline averages
+* real-world observed delays
 
-Fix: Used absolute paths with os.path.join()
+---
 
-🤖 Model Selection: XGBoost
+## 📈 Dashboard
 
-XGBoost was selected due to:
+An interactive dashboard allows users to:
 
-strong performance on tabular data
-ability to model nonlinear relationships
-robustness to noise
-efficient computation
-📐 Model Representation
-y
-^
-	​
+* input station and time
+* simulate delay scenarios
+* view predicted wait times
 
-=
-k=1
-∑
-K
-	​
+This demonstrates how predictions change under different conditions.
 
-f
-k
-	​
+---
 
-(X)
+## 🚀 What Makes This Project Different
 
-Each f
-k
-	​
+Unlike standard transit apps, this system:
 
- represents a decision tree.
+* focuses on **prediction during disruptions**, not normal conditions
+* models **sequential dependencies between trains**
+* aims to estimate **future delay propagation**, not just current status
 
-📈 Model Evaluation
+👉 In short:
+**From “Where is the train?” → to “What will happen next?”**
 
-Metrics used:
+---
 
-Mean Absolute Error (MAE)
-MAE=
-n
-1
-	​
+## 🔮 Future Work
 
-∑∣y−
-y
-^
-	​
+* Integrate real-time transit APIs
+* Add delay explainability (feature importance)
+* Compare predictions directly with official estimates
+* Expand to multi-line or network-level prediction
 
-∣
-Root Mean Squared Error (RMSE)
-RMSE=
-n
-1
-	​
+---
 
-∑(y−
-y
-^
-	​
+## 🛠 Tech Stack
 
-)
-2
-	​
+* Python
+* Pandas / NumPy
+* Scikit-learn
+* (Optional) Streamlit / Flask for dashboard
 
-R² Score
-R
-2
-=1−
-SS
-tot
-	​
+---
 
-SS
-res
-	​
+## 📎 Conclusion
 
-	​
-
-✅ Results
-Metric	Value
-MAE	~224 sec
-RMSE	~467 sec
-R²	~0.85
-🌐 System Architecture
-Raw Data → Preprocessing → Feature Engineering → XGBoost Model → Flask App → Dashboard
-🖥️ Web Application
-
-A Flask-based web interface allows users to:
-
-Input:
-Station (mapped from GTFS)
-Hour of day
-Previous delay
-Output:
-Predicted delay across upcoming stations
-Delay propagation visualization
-🎨 Dashboard Features
-Station-wise delay predictions
-Color-coded delay levels:
-🟢 Low (<120 sec)
-🟡 Medium (120–300 sec)
-🔴 High (>300 sec)
-Route simulation
-⚠️ Limitations
-Route progression currently uses sequential approximation (+i)
-No real-time integration
-No geospatial visualization
-Simplified delay propagation logic
-🚀 Future Work
-Integrate real-time transit APIs
-Use LSTM / time-series models
-Implement real route mapping using stop_times.txt
-Add map-based visualization
-Deploy as a scalable web service
-📌 Conclusion
-
-This project demonstrates how machine learning can be applied to model delay propagation in urban transit systems.
-
-By combining:
-
-data engineering
-predictive modeling
-web deployment
-
-the system provides a practical framework for intelligent transit prediction.
+This project explores how machine learning can move beyond static schedules and toward **dynamic, context-aware transit predictions**, especially in scenarios where traditional systems struggle the most.
